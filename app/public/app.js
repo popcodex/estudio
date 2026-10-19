@@ -1,0 +1,42 @@
+import {mountCollections} from './collections.js';
+import {mountAutomations} from './automations.js';
+import {mountLibrary,mountDashboard,mountTemplates} from './workspace.js';
+import {mountTasks} from './tasks.js';
+import {mountFiles,mountDocuments,saveDocument,documentDirty,disposeEditors,selectDocument} from './content.js';
+const $=s=>document.querySelector(s);let state={projects:[],tasks:[],notes:[]},selected=null,view='Tablero',query='',timer,dirty=false,saving=false;
+let editingProject=null;
+function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
+function error(e){$('#error').textContent=e.message;$('#error').hidden=false;$('#saved').textContent='No se pudo guardar';}
+async function api(kind,data){const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,data})});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
+async function load(){const r=await fetch('/api/state');if(!r.ok)throw Error('No se pudo abrir la biblioteca.');state=await r.json();$('#saved').textContent='Guardado local';}
+async function change(kind,data){try{$('#error').hidden=true;$('#saved').textContent='Guardando…';const r=await api(kind,data);await load();render();return r;}catch(e){error(e);const form=document.querySelector('dialog[open] form');if(form){let message=form.querySelector('.dialog-error');if(!message){message=el('p',undefined,'dialog-error');message.setAttribute('role','alert');form.append(message);}message.textContent=e.message;}}}
+async function saveNote(){if(!await saveDocument())return false;clearTimeout(timer);if(!dirty)return true;if(saving)return false;saving=true;const note=state.notes.find(n=>n.project===selected),body=$('#note')?.value;if(body===undefined){saving=false;return false;}$('#saved').textContent='Guardando…';try{const r=await api('note',{project:selected,body,revision:note.revision});note.body=body;note.revision=r.revision;dirty=$('#note')?.value!==body;$('#saved').textContent=dirty?'Cambios pendientes':'Guardado local';$('#error').hidden=true;return !dirty;}catch(e){error(e);return false;}finally{saving=false;if(dirty&&$('#error').hidden)timer=setTimeout(saveNote,600);}}
+async function navigate(id){if(!await saveNote())return;selected=id;if(view==='Biblioteca')view='Tablero';query='';$('#search').value='';render();}
+function button(text,fn,cls){const b=el('button',text,cls);b.onclick=fn;return b;}
+async function projectDialog(project=null){if(!await saveNote())return;editingProject=project?.id?project:null;const form=$('#projectForm');form.querySelector('.dialog-error')?.remove();form.reset();form.querySelector('h2').textContent=editingProject?'Editar proyecto':'Nuevo proyecto';form.querySelector('.primary').textContent=editingProject?'Guardar cambios':'Crear proyecto';if(editingProject){form.elements.name.value=project.name;form.elements.description.value=project.description;}$('#dialog').showModal();form.elements.name.focus();}
+async function openPage(id,project=selected){if(!await saveNote())return;selected=project;view='Documentos';selectDocument(id);query='';$('#search').value='';render();}
+function render(){
+ disposeEditors();
+ const nav=$('#projects');nav.replaceChildren();for(const p of state.projects)nav.append(button('▧  '+p.name,()=>navigate(p.id),selected===p.id?'active':''));
+ const root=$('#content');root.replaceChildren();const p=state.projects.find(p=>p.id===selected);$('#breadcrumb').textContent=p?'Mi espacio / '+p.name:'Mi espacio / Proyectos';
+ if(view==='Biblioteca'){mountLibrary(root);return;}
+ if(query){root.append(el('h1','Resultados de búsqueda'));let count=0;const add=(label,fn)=>{root.append(button(label,fn,'search-result'));count++;};for(const project of state.projects.filter(project=>(!selected||project.id===selected)&&(project.name+' '+project.description).toLowerCase().includes(query)))add('Proyecto · '+project.name,()=>navigate(project.id));for(const doc of state.documents.filter(d=>(!selected||d.project===selected)&&(d.title+' '+d.blocks.map(b=>b.text).join(' ')+' '+state.property_values.filter(v=>v.document===d.id).map(v=>v.value).join(' ')).toLowerCase().includes(query)))add('Página · '+doc.title,()=>openPage(doc.id,doc.project));for(const task of state.tasks.filter(t=>(!selected||t.project===selected)&&t.title.toLowerCase().includes(query)))add('Tarea · '+task.title,async()=>{await navigate(task.project);view='Lista';render();});for(const file of state.attachments.filter(a=>(!selected||a.project===selected)&&a.name.toLowerCase().includes(query)))add('Archivo · '+file.name,async()=>{await navigate(file.project);view='Multimedia';render();});for(const note of state.notes.filter(n=>(!selected||n.project===selected)&&n.body.toLowerCase().includes(query)))add('Notas · '+state.projects.find(p=>p.id===note.project).name,async()=>{await navigate(note.project);view='Notas';render();});if(!count)root.append(el('p','No hay coincidencias.','muted'));return;}
+ if(!p){root.append(el('div','TU ESPACIO DE TRABAJO','eyebrow'));const top=el('div',undefined,'top');top.append(el('h1','Tus proyectos'),button('+ Nuevo proyecto',projectDialog,'primary'));root.append(top,el('p','Ideas, documentos y tareas. Un lugar para avanzar a tu ritmo.','muted'));const cards=el('div',undefined,'cards');for(const p of state.projects.filter(p=>(p.name+' '+p.description+' '+state.tasks.filter(t=>t.project===p.id).map(t=>t.title).join(' ')).toLowerCase().includes(query))){const b=button('',()=>navigate(p.id),'card');const tasks=state.tasks.filter(t=>t.project===p.id);b.append(el('div','▧','icon'),el('h2',p.name),el('p',p.description||'Sin descripción'),el('small',`${tasks.filter(t=>t.status==='Hecha').length} de ${tasks.length} tareas completadas`));cards.append(b);}root.append(cards);mountDashboard(root,state);if(!cards.children.length)root.append(el('div',query?'No hay coincidencias.':'Crea tu primer proyecto para comenzar.','empty'));return;}
+ const projectTop=el('div',undefined,'top');projectTop.append(el('h1',p.name),button('Editar proyecto',()=>projectDialog(p)));root.append(el('div','PROYECTO','eyebrow'),projectTop,el('p',p.description||'Organiza aquí el trabajo de este proyecto.','muted'));
+ const tabs=el('div',undefined,'tabs');for(const tab of ['Tablero','Lista','Calendario','Notas','Documentos','Multimedia','Base de datos','Plantillas','Automatizaciones'])tabs.append(button(tab,async()=>{if(await saveNote()){view=tab;render();}},view===tab?'active':''));root.append(tabs);
+ if(view==='Base de datos'){mountCollections(root,p,state,openPage);return;}
+ if(view==='Automatizaciones'){mountAutomations(root,p,state,change);return;}
+ if(view==='Plantillas'){mountTemplates(root,p,state,change,openPage);return;}
+ if(view==='Multimedia'){mountFiles(root,p,state,async()=>{await load();render();});return;}
+ if(view==='Documentos'){mountDocuments(root,p,state,async()=>{await load();render();});return;}
+ if(view==='Notas'){const note=state.notes.find(n=>n.project===p.id);root.append(el('h2','Notas del proyecto'),el('p','Guardado automático. Texto simple en esta primera versión.','notehint'));const area=el('textarea',undefined,'note');area.id='note';area.setAttribute('aria-label','Notas del proyecto');area.value=note.body;area.oninput=()=>{dirty=true;$('#saved').textContent='Cambios pendientes';clearTimeout(timer);timer=setTimeout(saveNote,600);};root.append(area,button('Guardar ahora',saveNote));return;}
+ mountTasks(root,p,state,view,query,change);
+}
+$('#library').onclick=async()=>{if(!await saveNote())return;view='Biblioteca';query='';$('#search').value='';render();};
+$('#new').onclick=()=>projectDialog();$('#home').onclick=()=>navigate(null);$('#cancel').onclick=()=>$('#dialog').close();
+$('#projectForm').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,b=form.querySelector('.primary');b.disabled=true;const values=Object.fromEntries(new FormData(form));const r=await change(editingProject?'project-update':'project',editingProject?{...values,id:editingProject.id,revision:editingProject.revision}:values);b.disabled=false;if(r){$('#dialog').close();await navigate(editingProject?.id||r.id);}};
+$('#search').oninput=async e=>{if(!await saveNote())return;query=e.target.value.toLowerCase();render();};
+window.addEventListener('beforeunload',e=>{if(dirty||saving||documentDirty()){e.preventDefault();e.returnValue='';}});
+load().then(render).catch(error);
+
+window.estudioHasPendingChanges=()=>dirty||saving||documentDirty();

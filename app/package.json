@@ -1,0 +1,24 @@
+{
+  "name": "estudio-local",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "build:editor": "esbuild rich-entry.js --bundle --format=esm --minify --legal-comments=linked --outfile=public/rich.js"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.32.0",
+    "@tiptap/extension-table": "3.32.0",
+    "@tiptap/extension-task-item": "3.32.0",
+    "@tiptap/extension-task-list": "3.32.0",
+    "@tiptap/pm": "3.32.0",
+    "@tiptap/starter-kit": "3.32.0",
+    "esbuild": "0.28.2"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "license": "UNLICENSED"
+}
