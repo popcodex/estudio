@@ -1,5 +1,13 @@
 # Instalación y biblioteca
 
+## Instalar la versión de escritorio
+
+1. Descarga el DMG desde [Releases](https://github.com/popcodex/estudio/releases/latest).
+2. Abre el DMG y arrastra Estudio a Aplicaciones.
+3. Abre Estudio desde Aplicaciones y crea tu primer proyecto.
+
+La distribución requiere macOS 13.5 o posterior en Apple Silicon. Esta versión usa firma local de desarrollo y no está notarizada por Apple; Gatekeeper puede impedir su apertura.
+
 ## Desarrollo local
 
 Instala Node.js 26 o posterior y ejecuta los pasos del README. Usa la dirección exacta `http://127.0.0.1:4317`; el servidor comprueba Host y Origin. No lo expongas a Internet ni a una red compartida.

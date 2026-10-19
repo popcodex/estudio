@@ -6,6 +6,10 @@ Un espacio personal para organizar proyectos, tareas, documentos y archivos. Fun
 
 **Versión 0.5.0 · Interfaz en español · macOS Apple Silicon · Uso individual**
 
+[![Verificación](https://github.com/popcodex/estudio/actions/workflows/ci.yml/badge.svg)](https://github.com/popcodex/estudio/actions/workflows/ci.yml)
+
+[Descargar para Mac](https://github.com/popcodex/estudio/releases/latest) · [Ver instalación](docs/INSTALACION.md) · [Reportar un problema](https://github.com/popcodex/estudio/issues/new/choose)
+
 ![Proyectos con datos de demostración](docs/images/proyectos.png)
 
 ## Qué puedes hacer
